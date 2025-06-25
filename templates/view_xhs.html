@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>查看小红书数据: {{ filename }}</h2>
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>类型</th>
+                    <th>内容</th>
+                    <th>作者</th>
+                    <th>点赞数</th>
+                    <th>情感倾向</th>
+                    <th>时间</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in data %}
+                <tr>
+                    <td>
+                        {% if 'content' in item %}评论{% else %}笔记{% endif %}
+                    </td>
+                    <td>
+                        {% if 'content' in item %}
+                            {{ item.content }}
+                        {% else %}
+                            {{ item.desc }}
+                        {% endif %}
+                    </td>
+                    <td>{{ item.user_name }}</td>
+                    <td>{{ item.like_count }}</td>
+                    <td>
+                        {% if item.sentiment == "正面" %}
+                            <span class="badge bg-success">{{ item.sentiment }}</span>
+                        {% elif item.sentiment == "负面" %}
+                            <span class="badge bg-danger">{{ item.sentiment }}</span>
+                        {% else %}
+                            <span class="badge bg-secondary">{{ item.sentiment }}</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ item.time|datetime }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %} 

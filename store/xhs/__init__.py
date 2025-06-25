@@ -13,14 +13,17 @@
 # @Author  : relakkes@gmail.com
 # @Time    : 2024/1/14 17:34
 # @Desc    :
-from typing import List
+from typing import List, Dict, Optional
+import os
+import json
 
 import config
 from var import source_keyword_var
+from tools.sentiment import analyze_sentiment
+from tools import utils
 
-from . import xhs_store_impl
-from .xhs_store_image import *
 from .xhs_store_impl import *
+from .xhs_store_image import *
 
 
 class XhsStoreFactory:
@@ -38,79 +41,134 @@ class XhsStoreFactory:
         return store_class()
 
 
-def get_video_url_arr(note_item: Dict) -> List:
+def get_video_url_arr(note_item: Dict) -> List[str]:
     """
-    获取视频url数组
+    获取视频链接
     Args:
-        note_item:
+        note_item: 笔记数据字典
 
     Returns:
-
+        List[str]: 视频链接列表
     """
-    if note_item.get('type') != 'video':
-        return []
+    video_url_arr = []
+    if not note_item or note_item.get("type") != "video":
+        return video_url_arr
+        
+    video = note_item.get("video", {})
+    if not isinstance(video, dict):
+        return video_url_arr
+        
+    media = video.get("media", {})
+    if not isinstance(media, dict):
+        return video_url_arr
+        
+    stream = media.get("stream", {})
+    if not isinstance(stream, dict):
+        return video_url_arr
+        
+    h264 = stream.get("h264", [])
+    if not isinstance(h264, list):
+        return video_url_arr
+        
+    for item in h264:
+        if isinstance(item, dict) and item.get("master_url"):
+            video_url_arr.append(item["master_url"])
+            
+    return video_url_arr
 
-    videoArr = []
-    originVideoKey = note_item.get('video').get('consumer').get('origin_video_key')
-    if originVideoKey == '':
-        originVideoKey = note_item.get('video').get('consumer').get('originVideoKey')
-    # 降级有水印
-    if originVideoKey == '':
-        videos = note_item.get('video').get('media').get('stream').get('h264')
-        if type(videos).__name__ == 'list':
-            videoArr = [v.get('master_url') for v in videos]
-    else:
-        videoArr = [f"http://sns-video-bd.xhscdn.com/{originVideoKey}"]
 
-    return videoArr
-
-
-async def update_xhs_note(note_item: Dict):
+async def update_xhs_note(note_item: Dict) -> None:
     """
     更新小红书笔记
     Args:
-        note_item:
+        note_item: 笔记数据字典
 
     Returns:
-
+        None
     """
+    if not isinstance(note_item, dict):
+        utils.logger.error("[store.xhs.update_xhs_note] Invalid note_item type, expected dict")
+        return None
+        
     note_id = note_item.get("note_id")
+    if not note_id:
+        utils.logger.error("[store.xhs.update_xhs_note] Missing note_id")
+        return None
+        
     user_info = note_item.get("user", {})
+    if not isinstance(user_info, dict):
+        user_info = {}
+        
     interact_info = note_item.get("interact_info", {})
-    image_list: List[Dict] = note_item.get("image_list", [])
-    tag_list: List[Dict] = note_item.get("tag_list", [])
+    if not isinstance(interact_info, dict):
+        interact_info = {}
+        
+    image_list = note_item.get("image_list", [])
+    if not isinstance(image_list, list):
+        image_list = []
+        
+    tag_list = note_item.get("tag_list", [])
+    if not isinstance(tag_list, list):
+        tag_list = []
 
-    for img in image_list:
-        if img.get('url_default') != '':
-            img.update({'url': img.get('url_default')})
+    # 处理图片URL
+    image_urls = []
+    if image_list is not None:
+        for img in image_list:
+            if isinstance(img, dict) and img.get('url_default'):
+                img_url = img.get('url_default')
+                if img_url:
+                    image_urls.append(img_url)
 
     video_url = ','.join(get_video_url_arr(note_item))
+    
+    # 对描述内容进行情感分析
+    desc = note_item.get("desc", "")
+    sentiment = analyze_sentiment(desc)
+
+    # 处理标签
+    tags = []
+    if tag_list is not None:
+        for tag in tag_list:
+            if isinstance(tag, dict) and tag.get('type') == 'topic' and tag.get('name'):
+                tags.append(tag['name'])
 
     local_db_item = {
-        "note_id": note_item.get("note_id"), # 帖子id
-        "type": note_item.get("type"), # 帖子类型
-        "title": note_item.get("title") or note_item.get("desc", "")[:255], # 帖子标题
-        "desc": note_item.get("desc", ""), # 帖子描述
-        "video_url": video_url, # 帖子视频url
-        "time": note_item.get("time"), # 帖子发布时间
-        "last_update_time": note_item.get("last_update_time", 0), # 帖子最后更新时间
-        "user_id": user_info.get("user_id"), # 用户id
-        "nickname": user_info.get("nickname"), # 用户昵称
-        "avatar": user_info.get("avatar"), # 用户头像
-        "liked_count": interact_info.get("liked_count"), # 点赞数
-        "collected_count": interact_info.get("collected_count"), # 收藏数
-        "comment_count": interact_info.get("comment_count"), # 评论数
-        "share_count": interact_info.get("share_count"), # 分享数
-        "ip_location": note_item.get("ip_location", ""), # ip地址
-        "image_list": ','.join([img.get('url', '') for img in image_list]), # 图片url
-        "tag_list": ','.join([tag.get('name', '') for tag in tag_list if tag.get('type') == 'topic']), # 标签
-        "last_modify_ts": utils.get_current_timestamp(), # 最后更新时间戳（MediaCrawler程序生成的，主要用途在db存储的时候记录一条记录最新更新时间）
-        "note_url": f"https://www.xiaohongshu.com/explore/{note_id}?xsec_token={note_item.get('xsec_token')}&xsec_source=pc_search", # 帖子url
-        "source_keyword": source_keyword_var.get(), # 搜索关键词
-        "xsec_token": note_item.get("xsec_token"), # xsec_token
+        "note_id": note_id,  # 帖子id
+        "type": note_item.get("type", ""),  # 帖子类型
+        "title": note_item.get("title") or desc[:255],  # 帖子标题
+        "desc": desc,  # 帖子描述
+        "sentiment": sentiment,  # 情感倾向
+        "video_url": video_url,  # 帖子视频url
+        "time": note_item.get("time", 0),  # 帖子发布时间
+        "last_update_time": note_item.get("last_update_time", 0),  # 帖子最后更新时间
+        "user_id": user_info.get("user_id", ""),  # 用户id
+        "nickname": user_info.get("nickname", ""),  # 用户昵称
+        "avatar": user_info.get("avatar", ""),  # 用户头像
+        "liked_count": interact_info.get("liked_count", 0),  # 点赞数
+        "collected_count": interact_info.get("collected_count", 0),  # 收藏数
+        "comment_count": interact_info.get("comment_count", 0),  # 评论数
+        "share_count": interact_info.get("share_count", 0),  # 分享数
+        "ip_location": note_item.get("ip_location", ""),  # ip地址
+        "image_list": ','.join(image_urls),  # 图片url
+        "tag_list": ','.join(tags),  # 标签
+        "last_modify_ts": utils.get_current_timestamp(),  # 最后更新时间戳
+        "note_url": f"https://www.xiaohongshu.com/explore/{note_id}",  # 移除xsec_token参数，避免URL过长
+        "source_keyword": source_keyword_var.get() if source_keyword_var.get() else "",  # 搜索关键词
     }
-    utils.logger.info(f"[store.xhs.update_xhs_note] xhs note: {local_db_item}")
-    await XhsStoreFactory.create_store().store_content(local_db_item)
+    
+    utils.logger.info(f"[store.xhs.update_xhs_note] xhs note:{local_db_item}")
+    
+    try:
+        # 保存到文件
+        save_dir = os.path.join('data', 'xhs', 'json')
+        os.makedirs(save_dir, exist_ok=True)
+        file_path = os.path.join(save_dir, f"{note_id}.json")
+        
+        with open(file_path, 'w', encoding='utf-8') as f:
+            json.dump(local_db_item, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        utils.logger.error(f"[store.xhs.update_xhs_note] Failed to save note {note_id}: {e}")
 
 
 async def batch_update_xhs_note_comments(note_id: str, comments: List[Dict]):

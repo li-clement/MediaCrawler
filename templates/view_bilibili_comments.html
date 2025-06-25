@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>查看B站评论数据: {{ filename }}</h2>
+    {% if data and data|length > 0 %}
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>用户头像</th>
+                    <th>昵称</th>
+                    <th>评论内容</th>
+                    <th>点赞数</th>
+                    <th>评论时间</th>
+                    <th>情感倾向</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in data %}
+                <tr>
+                    <td><img src="{{ item.avatar }}" alt="avatar" width="36" height="36"></td>
+                    <td>{{ item.nickname }}</td>
+                    <td>{{ item.content|default('无内容', true) }}</td>
+                    <td>{{ item.like_count }}</td>
+                    <td>{{ item.create_time|datetime }}</td>
+                    <td>
+                        {% if item.sentiment == '正面' %}
+                            <span class="badge bg-success">正面</span>
+                        {% elif item.sentiment == '负面' %}
+                            <span class="badge bg-danger">负面</span>
+                        {% elif item.sentiment == '中性' %}
+                            <span class="badge bg-secondary">中性</span>
+                        {% else %}
+                            <span class="badge bg-light text-dark">未知</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="alert alert-warning mt-4">暂无评论数据</div>
+    {% endif %}
+</div>
+{% endblock %} 

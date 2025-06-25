@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>查看B站数据: {{ filename }}</h2>
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>标题</th>
+                    <th>描述</th>
+                    <th>UP主</th>
+                    <th>播放量</th>
+                    <th>点赞数</th>
+                    <th>情感倾向</th>
+                    <th>发布时间</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in data %}
+                <tr>
+                    <td>
+                        {% if item.bvid %}
+                            <a href="https://www.bilibili.com/video/{{ item.bvid }}" target="_blank">
+                                {{ item.title }}
+                            </a>
+                        {% else %}
+                            {{ item.title }}
+                        {% endif %}
+                    </td>
+                    <td>{{ item.description|default('无描述', true) }}</td>
+                    <td>{{ item.author }}</td>
+                    <td>{{ item.view_count|default('0', true) }}</td>
+                    <td>{{ item.like_count|default('0', true) }}</td>
+                    <td>
+                        {% if item.sentiment == "正面" %}
+                            <span class="badge bg-success">{{ item.sentiment }}</span>
+                        {% elif item.sentiment == "负面" %}
+                            <span class="badge bg-danger">{{ item.sentiment }}</span>
+                        {% else %}
+                            <span class="badge bg-secondary">{{ item.sentiment }}</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ item.pubdate|datetime }}</td>
+                </tr>
+                {% if item.comments %}
+                <tr>
+                    <td colspan="7">
+                        <div class="comments-section">
+                            <h5>评论</h5>
+                            <ul class="list-group">
+                                {% for comment in item.comments %}
+                                <li class="list-group-item">
+                                    <div class="d-flex justify-content-between">
+                                        <div>
+                                            <strong>{{ comment.user_name }}:</strong> 
+                                            {{ comment.content }}
+                                        </div>
+                                        <div>
+                                            <span class="badge {% if comment.sentiment == '正面' %}bg-success{% elif comment.sentiment == '负面' %}bg-danger{% else %}bg-secondary{% endif %}">
+                                                {{ comment.sentiment }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </td>
+                </tr>
+                {% endif %}
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %} 
