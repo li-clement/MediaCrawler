@@ -232,17 +232,6 @@ async def save_creator(user_id: str, creator: Dict):
     """
     user_info = creator.get('basicInfo', {})
 
-    follows = 0
-    fans = 0
-    interaction = 0
-    for i in creator.get('interactions'):
-        if i.get('type') == 'follows':
-            follows = i.get('count')
-        elif i.get('type') == 'fans':
-            fans = i.get('count')
-        elif i.get('type') == 'interaction':
-            interaction = i.get('count')
-
     def get_gender(gender):
         if gender == 1:
             return '女'
@@ -250,6 +239,17 @@ async def save_creator(user_id: str, creator: Dict):
             return '男'
         else:
             return None
+
+    follows = 0
+    fans = 0
+    interaction = 0
+    for i in creator.get('interactions', []):
+        if i.get('type') == 'follows':
+            follows = i.get('count')
+        elif i.get('type') == 'fans':
+            fans = i.get('count')
+        elif i.get('type') == 'interaction':
+            interaction = i.get('count')
 
     local_db_item = {
         'user_id': user_id,  # 用户id
@@ -261,7 +261,7 @@ async def save_creator(user_id: str, creator: Dict):
         'follows': follows, # 关注数
         'fans': fans,  # 粉丝数
         'interaction': interaction, # 互动数
-        'tag_list': json.dumps({tag.get('tagType'): tag.get('name') for tag in creator.get('tags')},
+        'tag_list': json.dumps({tag.get('tagType'): tag.get('name') for tag in (creator.get('tags') or [])},
                                ensure_ascii=False), # 标签
         "last_modify_ts": utils.get_current_timestamp(), # 最后更新时间戳（MediaCrawler程序生成的，主要用途在db存储的时候记录一条记录最新更新时间）
     }
