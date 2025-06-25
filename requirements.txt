@@ -17,3 +17,6 @@ requests==2.32.3
 parsel==1.9.1
 pyexecjs==1.5.1
 pandas==2.2.3
+Flask>=2.0.0
+snownlp>=0.12.3
+textblob>=0.18.0
